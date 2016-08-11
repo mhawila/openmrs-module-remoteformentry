@@ -1,5 +1,7 @@
 # maven ignores
 target/*
+api/target/*
+omod/target/*
 
 # IntelliJ ignores
 *.iml
