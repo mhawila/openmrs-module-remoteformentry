@@ -1,25 +1,5 @@
 package org.openmrs.module.remoteformentry;
 
-import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.Vector;
-
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpressionException;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -47,6 +27,21 @@ import org.openmrs.validator.PatientIdentifierValidator;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import java.io.File;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Vector;
 
 /**
  * Remote form entry utility methods
@@ -770,6 +765,16 @@ public class RemoteFormEntryUtil {
 						currentAttribute.setVoidedBy(enterer);
 						currentAttribute.setDateVoided(new Date());
 					}
+				} else {
+					// Void all known attribute of this type
+					for(Map.Entry<String, PersonAttribute> entry: knownAttributes.entrySet()) {
+						PersonAttribute existing = entry.getValue();
+						if(existing.getAttributeType().getId() == newPersonAttribute.getAttributeType().getId()) {
+							existing.setVoided(true);
+							existing.setVoidedBy(enterer);
+							existing.setVoidReason("Value is being updated");
+						}
+					}
 				}
 			}
 		}		
@@ -825,13 +830,22 @@ public class RemoteFormEntryUtil {
 			
 			// get the type id
 			String typeId = xp.evaluate(RemoteFormEntryConstants.PERSON_RELATIONSHIP_TYPE, currentNode);
-			if (StringUtils.isBlank(typeId)) {
-				log.error("skipping a relationship with no relationship type id. node: "
-				        + currentNode.getTextContent());
+
+			RelationshipType relType = null;
+
+			if(StringUtils.isNotBlank(typeId)) {
+				relType =  Context.getPersonService().getRelationshipType(Integer.valueOf(typeId));
+				if(relType == null) {
+					log.error("Could not find relationship type with id " + typeId);
+				}
 			} else {
+				log.error("skipping a relationship with no relationship type id. node: "
+						+ currentNode.getTextContent());
+			}
+
+			if(relType != null) {
 				try {
-					RelationshipType pat = Context.getPersonService().getRelationshipType(Integer.valueOf(typeId));
-					relationship.setRelationshipType(pat);
+					relationship.setRelationshipType(relType);
 	
 					// get the other person from our db
 					String otherPersonsUuid = xp.evaluate(RemoteFormEntryConstants.PERSON_RELATIONSHIP_UUID, currentNode);
@@ -876,13 +890,16 @@ public class RemoteFormEntryUtil {
 								StringUtils.isNotBlank(locationId)) {
 							PatientIdentifierType pit = Context.getPatientService().getPatientIdentifierType(Integer.valueOf(identifierTypeId));
 							Location loc = Context.getLocationService().getLocation(locationId);
-							pid = new PatientIdentifier(identifierStr, pit, loc);
+							if(loc != null) {
+								pid = new PatientIdentifier(identifierStr, pit, loc);
+							}
 						}
 
 						// if the relative has a patient identifier, assume it
 						// is a patient, add the identifier, then save it
 						if (pid != null) {
 							Patient pRelative = new Patient(relative);
+							pid.setPreferred(true);
 							pRelative.addIdentifier(pid);
 							pRelative.setUuid(otherPersonsUuid); // this shouldn't be necessary, but it is
 							relative = Context.getPatientService().savePatient(pRelative);

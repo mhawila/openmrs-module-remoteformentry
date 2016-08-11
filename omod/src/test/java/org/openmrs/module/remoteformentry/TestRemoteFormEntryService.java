@@ -1,11 +1,25 @@
 package org.openmrs.module.remoteformentry;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.junit.Test;
+import org.openmrs.EncounterType;
+import org.openmrs.Patient;
+import org.openmrs.PatientIdentifier;
+import org.openmrs.PersonAddress;
+import org.openmrs.PersonAttribute;
+import org.openmrs.PersonName;
+import org.openmrs.Relationship;
+import org.openmrs.api.EncounterService;
+import org.openmrs.api.PatientService;
+import org.openmrs.api.context.Context;
+import org.openmrs.test.BaseModuleContextSensitiveTest;
+import org.w3c.dom.Document;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathFactory;
 import java.io.File;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -14,31 +28,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.Vector;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathFactory;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.junit.Test;
-import org.openmrs.Concept;
-import org.openmrs.EncounterType;
-import org.openmrs.Location;
-import org.openmrs.Patient;
-import org.openmrs.PatientIdentifier;
-import org.openmrs.PatientIdentifierType;
-import org.openmrs.PersonAddress;
-import org.openmrs.PersonAttribute;
-import org.openmrs.PersonAttributeType;
-import org.openmrs.PersonName;
-import org.openmrs.Relationship;
-import org.openmrs.RelationshipType;
-import org.openmrs.api.EncounterService;
-import org.openmrs.api.PatientService;
-import org.openmrs.api.context.Context;
-import org.openmrs.test.BaseModuleContextSensitiveTest;
-import org.w3c.dom.Document;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class tests the different methods in the RemoteFormEntryService
@@ -237,21 +231,28 @@ public class TestRemoteFormEntryService extends BaseModuleContextSensitiveTest {
     	assertTrue(identifiers.size() + " is not valid", identifiers.size() == 2);
     	
     	PatientIdentifier prefIdentifier = patient.getPatientIdentifier();
-    	PatientIdentifier firstIdentifier = (PatientIdentifier)identifiers.toArray()[0];
+		PatientIdentifier firstIdentifier = null, secondIdentifier = null;
+		if(prefIdentifier.equalsContent((PatientIdentifier)identifiers.toArray()[0])) {
+			firstIdentifier = (PatientIdentifier)identifiers.toArray()[0];
+			secondIdentifier = (PatientIdentifier)identifiers.toArray()[1];
+		} else {
+			firstIdentifier = (PatientIdentifier)identifiers.toArray()[1];
+			secondIdentifier = (PatientIdentifier)identifiers.toArray()[0];
+		}
+
     	assertEquals(prefIdentifier, firstIdentifier);
     	assertTrue(prefIdentifier.equalsContent(firstIdentifier));
     	
     	assertTrue(prefIdentifier.getIdentifier() + " is not valid", "123456789".equals(prefIdentifier.getIdentifier()));
-    	assertTrue(prefIdentifier.getIdentifierType() + " is not valid", prefIdentifier.getIdentifierType().equals(new PatientIdentifierType(2)));
-    	assertTrue(prefIdentifier.getLocation() + " is not valid", prefIdentifier.getLocation().equals(new Location(1)));
+    	assertTrue(prefIdentifier.getIdentifierType() + " is not valid", prefIdentifier.getIdentifierType().getId() == 2);
+    	assertTrue(prefIdentifier.getLocation() + " is not valid", prefIdentifier.getLocation().getId() == 1);
     	assertTrue(prefIdentifier.getCreator() + " is not valid", prefIdentifier.getCreator().getId().equals(1));
     	assertTrue(prefIdentifier.isPreferred());
     	assertFalse(prefIdentifier.isVoided());
     	
-    	PatientIdentifier secondIdentifier = (PatientIdentifier)identifiers.toArray()[1];
     	assertTrue(secondIdentifier.getIdentifier() + " is not valid", "1234567890".equals(secondIdentifier.getIdentifier()));
-    	assertTrue(secondIdentifier.getIdentifierType() + " is not valid", secondIdentifier.getIdentifierType().equals(new PatientIdentifierType(4)));
-    	assertTrue(secondIdentifier.getLocation() + " is not valid", secondIdentifier.getLocation().equals(new Location(1)));
+    	assertTrue(secondIdentifier.getIdentifierType() + " is not valid", secondIdentifier.getIdentifierType().getId() == 4);
+    	assertTrue(secondIdentifier.getLocation() + " is not valid", secondIdentifier.getLocation().getId() == 1);
     	assertTrue(secondIdentifier.getCreator() + " is not valid", secondIdentifier.getCreator().getId().equals(1));
     	assertFalse(secondIdentifier.isPreferred());
     	assertTrue(secondIdentifier.isVoided());
@@ -314,7 +315,7 @@ public class TestRemoteFormEntryService extends BaseModuleContextSensitiveTest {
     		else
     			assertTrue(attribute.getValue() + " is not valid", "5".equals(attribute.getValue()));
     		
-	    	assertTrue(attribute.getAttributeType() + " is not valid", attribute.getAttributeType().equals(new PersonAttributeType(8)));
+	    	assertTrue(attribute.getAttributeType() + " is not valid", attribute.getAttributeType().getId() == 8);
 	    	assertTrue(attribute.getCreator() + " is not valid", attribute.getCreator().getId().equals(1));
     	}
     	
@@ -324,15 +325,15 @@ public class TestRemoteFormEntryService extends BaseModuleContextSensitiveTest {
     	assertTrue(patient.isBirthdateEstimated());
     	assertTrue(patient.isDead());
     	assertTrue(patient.getDeathDate() + " is not valid", patient.getDeathDate().equals(format.parse("01/01/2001")));
-    	assertTrue(patient.getCauseOfDeath() + " is not valid", patient.getCauseOfDeath().equals(new Concept(22)));
+    	assertTrue(patient.getCauseOfDeath() + " is not valid", patient.getCauseOfDeath().getConceptId() == 22);
     	assertTrue(patient.getGender() + " is not valid", patient.getGender().equals("M"));    	
     	
     	// compare the relationships
     	List<Relationship> relationships = Context.getPersonService().getRelationshipsByPerson(patient);
-    	assertTrue(relationships.size() + " is not the right # of relationships", relationships.size() == 2);
+    	assertTrue(relationships.size() + " is not the right # of relationships", relationships.size() == 1);
     	
     	for (Relationship rel : relationships) {
-    		if (rel.getRelationshipType().equals(new RelationshipType(1))) {
+    		if (rel.getRelationshipType().getId() == 1) {
     			assertEquals("d44fdcf2-45ff-11de-abd9-0010c6dffd0f", rel.getPersonA().getUuid()); // the newly created person for this relationship
     			assertEquals(patient, rel.getPersonB()); // the patient for this form created during this remoteformentry
     		}

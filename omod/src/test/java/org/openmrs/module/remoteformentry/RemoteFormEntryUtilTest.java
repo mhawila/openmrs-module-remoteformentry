@@ -1,17 +1,7 @@
 package org.openmrs.module.remoteformentry;
 
-import java.io.File;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathFactory;
-
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Location;
 import org.openmrs.Patient;
@@ -20,8 +10,8 @@ import org.openmrs.PatientIdentifierType;
 import org.openmrs.Person;
 import org.openmrs.PersonAttribute;
 import org.openmrs.PersonAttributeType;
+import org.openmrs.PersonName;
 import org.openmrs.Relationship;
-import org.openmrs.RelationshipType;
 import org.openmrs.User;
 import org.openmrs.api.context.Context;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
@@ -29,10 +19,29 @@ import org.openmrs.test.Verifies;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathFactory;
+import java.io.File;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
 public class RemoteFormEntryUtilTest extends BaseModuleContextSensitiveTest {
 
 	// used in various tests
 	public static final String SAMPLE_XML_PERSON_UUID = "2178037d-f86b-4f12-8d8b-be3ebc220022";
+	private PersonName testName = null;
+
+	@Before
+	public void setup() {
+		testName = new PersonName();
+		testName.setFamilyName("test");
+		testName.setMiddleName("test");
+		testName.setGivenName("test");
+	}
 
 	/**
 	 * @see {@link RemoteFormEntryUtil#getRelationships(Patient,Document,XPath,User)}
@@ -65,7 +74,7 @@ public class RemoteFormEntryUtilTest extends BaseModuleContextSensitiveTest {
 		// relationship type id
 		Assert.assertEquals(
 				"relationship with a blank type id is being processed",
-				nodeList.getLength() - 1, relationships.size());
+				nodeList.getLength() - 2, relationships.size());
 	}
 
 	/**
@@ -96,10 +105,10 @@ public class RemoteFormEntryUtilTest extends BaseModuleContextSensitiveTest {
 				.getRelationships(createdPatient, doc, xp, enterer);
 
 		// there should be two relationships
-		Assert.assertEquals("something went horribly wrong", 2, relationships.size());
+		Assert.assertEquals("something went horribly wrong", 1, relationships.size());
 		
 		for (Relationship rel : relationships) {
-    		if (rel.getRelationshipType().equals(new RelationshipType(1))) {
+    		if (rel.getRelationshipType().getId() == 1) {
 				// the relationship of type "1" should be to a person who is not a patient
     			Assert.assertFalse(rel.getPersonA().isPatient());
     		}
@@ -166,7 +175,8 @@ public class RemoteFormEntryUtilTest extends BaseModuleContextSensitiveTest {
 		pis.add(pi1);
 		pis.add(pi2);
 		patient.setIdentifiers(pis);
-		
+
+		patient.addName(testName);
 		patient = Context.getPatientService().savePatient(patient);
 
 		// build all the variables that are passed to setPersonAttributes()
@@ -230,7 +240,8 @@ public class RemoteFormEntryUtilTest extends BaseModuleContextSensitiveTest {
 		pis.add(pi1);
 		pis.add(pi2);
 		patient.setIdentifiers(pis);
-		
+		patient.addName(testName);
+
 		patient = Context.getPatientService().savePatient(patient);
 
 		// build all the variables that are passed to setPersonAttributes()
